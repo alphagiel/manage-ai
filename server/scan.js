@@ -170,7 +170,8 @@ export async function listCategory(toolId, catId) {
   }
 
   const sizeMap = await sizes(paths);
-  const projects = tool.id === 'claude' ? await claudeProjectNames() : null;
+  const projects = tool.id === 'claude' ? await claudeProjectNames()
+    : tool.id === 'vscode-copilot' ? await vscodeWorkspaces(tool.root) : null;
   const items = await Promise.all(paths.map(async (p) => {
     let st;
     try { st = await fs.stat(p); } catch { return null; }
@@ -202,8 +203,41 @@ function groupLabel(tool, p, projects) {
     return rel[1];
   }
   if (tool.id === 'gemini' && rel[0] === 'tmp' && rel[1]) return rel[1].slice(0, 8);
-  if (tool.id === 'vscode-copilot' && rel[0] === 'workspaceStorage') return rel[1]?.slice(0, 8);
+  if (tool.id === 'vscode-copilot' && rel[0] === 'workspaceStorage' && rel[1]) {
+    const real = projects?.get(rel[1]);
+    if (real) return real.startsWith(HOME) ? real.replace(HOME, '~') : real;
+    return 'Unknown folder';
+  }
+  if (tool.id === 'vscode-copilot') return 'No folder open';
   return '';
+}
+
+/** VS Code workspaceStorage/<hash> → the folder that was open, from workspace.json. */
+async function vscodeWorkspaces(root) {
+  const map = new Map();
+  const dir = path.join(root, 'workspaceStorage');
+  let hashes = [];
+  try { hashes = await fs.readdir(dir); } catch { return map; }
+  await Promise.all(hashes.map(async (h) => {
+    try {
+      const j = JSON.parse(await fs.readFile(path.join(dir, h, 'workspace.json'), 'utf8'));
+      const uri = j.folder || j.workspace;
+      if (!uri) return;
+      const u = new URL(uri);
+      let p = decodeURIComponent(u.pathname);
+      if (u.protocol !== 'file:') p = `${u.protocol.replace(':', '')} ${p}`;
+      if (j.workspace) {
+        // Multi-root workspace: name it after its folders
+        try {
+          const ws = JSON.parse((await fs.readFile(p, 'utf8')).replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
+          const dirs = (ws.folders || []).map((f) => path.resolve(path.dirname(p), f.path || '')).filter(Boolean);
+          if (dirs.length) p = dirs.length > 1 ? `${dirs[0]} + ${dirs.length - 1} more` : dirs[0];
+        } catch { p = 'A multi-folder workspace'; }
+      }
+      map.set(h, p);
+    } catch { /* no workspace.json */ }
+  }));
+  return map;
 }
 
 /** Install folders of Claude plugins, from installed_plugins.json. */

@@ -410,6 +410,11 @@ function ItemList({ tool, cats, kind }) {
   const sel = shown.filter((i) => picked.has(i.path));
   const selSize = sel.reduce((a, i) => a + i.size, 0);
   const toggle = (p) => setPicked((s) => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n; });
+  const allOn = shown.length > 0 && sel.length === shown.length;
+  const someOn = sel.length > 0 && !allOn;
+  const pickAll = () => setPicked(allOn ? new Set() : new Set(shown.map((i) => i.path)));
+  const shownSize = shown.reduce((a, i) => a + i.size, 0);
+  const filtered = !!(query.trim() || project);
 
   // Group: chats by date, multi-category kinds (add-ons) by category, else one list
   const byDate = kind === 'chats' || kind === 'memory';
@@ -453,6 +458,13 @@ function ItemList({ tool, cats, kind }) {
       ? html`<div class="card empty"><${Byte} size=${72} mood="think" /><h2>${all.length ? 'No matches' : `No ${K.many} yet`}</h2>${all.length ? 'Try another word.' : ''}</div>`
       : html`
         <div class="card list">
+          ${!readonly && shown.length > 1 && html`
+            <div class="pick-all" role="checkbox" aria-checked=${allOn ? 'true' : someOn ? 'mixed' : 'false'} tabindex="0"
+              onClick=${pickAll} onKeyDown=${(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); pickAll(); } }}>
+              <span class="pick ${allOn ? 'on' : someOn ? 'some' : ''}">${allOn ? G.check : someOn ? html`<i />` : ''}</span>
+              <span>${allOn ? 'Unpick all' : `Pick all ${shown.length.toLocaleString()}${filtered ? ' matches' : ''}`}</span>
+              <span class="ink-3">· ${bytes(shownSize)}</span>
+            </div>`}
           ${groups.map((g) => html`
             ${g.name && html`<div class="group-label">${g.name}</div>`}
             ${g.items.map((i) => html`
@@ -481,9 +493,9 @@ function ItemList({ tool, cats, kind }) {
 
     ${sel.length > 0 && html`
       <div class="float">
-        <span>${plural(sel.length, K.one, K.many)} picked · ${bytes(selSize)}</span>
+        <span>${allOn && sel.length > 1 ? `All ${sel.length.toLocaleString()} ${K.many}` : plural(sel.length, K.one, K.many)} picked · ${bytes(selSize)}</span>
         <button class="btn quiet small" onClick=${() => setPicked(new Set())}>Cancel</button>
-        <button class="btn danger" onClick=${del}>Delete</button>
+        <button class="btn danger" onClick=${del}>${allOn && sel.length > 1 ? 'Delete all' : 'Delete'}</button>
       </div>`}`;
 }
 
