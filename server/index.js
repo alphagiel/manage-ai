@@ -6,16 +6,18 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { overview, listCategory } from './scan.js';
 import { readChat, listMcp } from './readers.js';
 import { readFileForView, trash, restore, save, removeMcp, guard, trashHistory } from './actions.js';
 import { TOOL_BY_ID } from './tools.js';
 
-const PORT = Number(process.env.PORT) || 4747;
 const HOST = '127.0.0.1';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = path.join(ROOT, 'public');
-const VENDOR = path.join(ROOT, 'node_modules', 'htm', 'preact', 'standalone.module.js');
+// Resolved through Node so it works when npx hoists htm somewhere else
+// (htm's main entry is dist/htm.js, so its package root is two levels up)
+const VENDOR = path.join(path.dirname(path.dirname(createRequire(import.meta.url).resolve('htm'))), 'preact', 'standalone.module.js');
 
 // Random per-run token. Only the page we serve knows it, so other websites
 // can't make your browser call this server (CSRF / DNS-rebinding guard).
@@ -118,6 +120,13 @@ app.get('*', async (c) => {
   });
 });
 
-serve({ fetch: app.fetch, port: PORT, hostname: HOST }, () => {
-  console.log(`\n  manage-ai → http://localhost:${PORT}\n`);
-});
+/** Starts the server. Tries the next port if one is taken. Resolves with the URL. */
+export function start(port = 4747, tries = 10) {
+  return new Promise((resolve, reject) => {
+    const server = serve({ fetch: app.fetch, port, hostname: HOST }, () => resolve(`http://localhost:${port}`));
+    server.on('error', (e) => {
+      if (e.code === 'EADDRINUSE' && tries > 1) resolve(start(port + 1, tries - 1));
+      else reject(e);
+    });
+  });
+}

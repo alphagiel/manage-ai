@@ -22,13 +22,15 @@ export async function guard(p, { forWrite = false } = {}) {
   if (typeof p !== 'string' || !path.isAbsolute(p)) throw httpError(400, 'Bad path');
   const resolved = path.resolve(p);
 
-  const roots = TOOLS.map((t) => t.root);
+  // Compare real paths on both sides, so symlinks (e.g. /tmp → /private/tmp) still match
+  const roots = await Promise.all(TOOLS.map((t) => realish(t.root)));
   const files = new Set(TOOLS.flatMap((t) => (t.extraFiles || []).map((f) => f.path)));
   for (const m of await listMcp()) if (m.source?.startsWith('/')) files.add(m.source);
+  const realFiles = new Set(await Promise.all([...files].map(realish)));
 
   const real = await realish(resolved);
   const insideRoot = roots.some((r) => real !== r && real.startsWith(r + path.sep));
-  if (!insideRoot && !files.has(resolved)) throw httpError(403, 'Outside AI tool folders');
+  if (!insideRoot && !files.has(resolved) && !realFiles.has(real)) throw httpError(403, 'Outside AI tool folders');
   if (forWrite && roots.includes(real)) throw httpError(403, 'Won’t touch a whole tool folder');
   return resolved;
 }

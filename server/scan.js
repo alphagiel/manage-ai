@@ -202,7 +202,7 @@ function groupLabel(tool, p, projects) {
     if (real) return real === HOME ? '~' : real.replace(HOME + path.sep, '~/');
     return rel[1];
   }
-  if (tool.id === 'gemini' && rel[0] === 'tmp' && rel[1]) return rel[1].slice(0, 8);
+  // Gemini only keeps a hash of the project path, so there's no friendly name to show
   if (tool.id === 'vscode-copilot' && rel[0] === 'workspaceStorage' && rel[1]) {
     const real = projects?.get(rel[1]);
     if (real) return real.startsWith(HOME) ? real.replace(HOME, '~') : real;

@@ -1,16 +1,49 @@
 {
   "name": "manage-ai",
   "version": "0.1.0",
-  "private": true,
-  "description": "Local dashboard for everything AI coding tools save on your machine.",
+  "description": "See and clean up everything your AI coding tools save on your computer. Runs locally — nothing leaves your machine.",
+  "keywords": [
+    "ai",
+    "claude",
+    "claude-code",
+    "codex",
+    "copilot",
+    "cursor",
+    "gemini",
+    "windsurf",
+    "mcp",
+    "privacy",
+    "cleanup",
+    "disk-space"
+  ],
+  "license": "MIT",
+  "author": "Alpha Giel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alphagiel/manage-ai.git"
+  },
   "type": "module",
+  "bin": {
+    "manage-ai": "bin/manage-ai.js"
+  },
+  "files": [
+    "bin",
+    "server",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "start": "node bin/manage-ai.js",
+    "dev": "node --watch bin/manage-ai.js --no-open",
+    "demo": "node scripts/demo-seed.js && HOME=/tmp/manage-ai-demo node bin/manage-ai.js"
   },
   "engines": {
     "node": ">=20"
   },
+  "os": [
+    "darwin"
+  ],
   "dependencies": {
     "@hono/node-server": "^2.1.11",
     "hono": "^4.13.22",

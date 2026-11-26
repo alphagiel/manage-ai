@@ -4,12 +4,38 @@ One local dashboard for everything AI coding tools save on your Mac.
 
 See it, search it, edit it, clean it up — chats, memory, rules, settings, MCP servers, skills, plugins, caches.
 
+![manage-ai demo](docs/demo.gif)
+
+▶️ [Watch in full quality](docs/demo.mp4)
+
+| Home | Inside a tool |
+| --- | --- |
+| ![Home: every AI tool on your Mac](docs/home.png) | ![Inside Claude Code: chats, memory, rules and more](docs/tool.png) |
+
 ## Run
 
 ```sh
-npm install
-npm start        # → http://localhost:4747
+npx manage-ai
 ```
+
+Opens http://localhost:4747 in your browser. Options: `--port 5000`, `--no-open`.
+
+macOS only for now.
+
+### From source
+
+```sh
+npm install
+npm start
+```
+
+### Demo mode
+
+```sh
+npm run demo
+```
+
+Fills a fake home folder (`/tmp/manage-ai-demo`) with made-up chats, memory and junk from every tool, then runs manage-ai on it. Your real files aren't touched, so it's safe for screenshots, videos and trying deletes.
 
 ## Supports
 

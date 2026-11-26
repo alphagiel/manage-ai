@@ -275,7 +275,7 @@ function HomePage() {
       <button class="btn primary big" onClick=${() => go('cleanup')}>🧹 Free up ${bytes(junkSize)}</button>
       <small>Only junk. Nothing you’d miss.</small>`}>
       Hey! 👋 I looked around your Mac. You’ve used <b>${plural(tools.length, 'AI tool', 'AI tools')}</b>,
-      and they’re keeping <b>${bytes(ov.total)}</b> of stuff — about as much as ${photos(ov.total)} photos.
+      and they’re keeping <b>${bytes(ov.total)}</b> of stuff${ov.total >= 8 * 1024 * 1024 ? ` — about as much as ${photos(ov.total)} photos` : ''}.
     <//>
 
     <div class="section-title"><h2>Your AI tools</h2><span class="ink-3">Tap one to see what it keeps</span></div>
@@ -335,7 +335,7 @@ function ToolPage({ toolId }) {
     <${Tip}>
       <b>${tool.name}</b> is keeping ${bytes(tool.size)}.
       ${biggest && biggest.size > 0 && html` Most of it is <b>${KINDS[biggest.kind].label.toLowerCase()}</b>.`}
-      Tap a box to look inside.
+      ${' '}Tap a box to look inside.
     <//>
 
     <div class="buckets">
