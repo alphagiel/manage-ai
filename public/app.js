@@ -10,7 +10,8 @@
 // raw files only behind "Show file details".
 
 import { html, render, createContext, useState, useEffect, useMemo, useRef, useCallback, useContext } from '/vendor/preact.js';
-import { Byte, ART, G } from '/art.js';
+import { Logo, ART, G } from '/art.js';
+import { explain } from '/explain.js';
 
 // ---------- api ----------
 
@@ -195,13 +196,14 @@ function App() {
   else if (view === 'cleanup') page = html`<${CleanupPage} />`;
   else if (view === 'connections') page = html`<${ConnectionsPage} />`;
   else if (view === 'deleted') page = html`<${DeletedPage} />`;
+  else if (view === 'duplicates') page = html`<${DuplicatesPage} key=${version} />`;
   else page = html`<${HomePage} />`;
 
   return html`
     <${Ctx.Provider} value=${app}>
       <div class="wrap">
         <header class="top">
-          <a class="logo" href="#/"><${Byte} size=${34} /> manage-ai</a>
+          <a class="logo" href="#/"><${Logo} size=${34} /> manage-ai</a>
           <div class="grow" />
           <label class="switch" title="Show real file names and paths">
             <input type="checkbox" checked=${details} onChange=${(e) => setDetails(e.target.checked)} />
@@ -222,6 +224,185 @@ function App() {
           </div>`)}
       </div>
     <//>`;
+}
+
+// ---------- duplicate add-ons ----------
+
+/** Line diff (LCS). Returns [{ t: ' ' | '+' | '-', line }]. */
+function lineDiff(a, b) {
+  const A = a.split('\n').slice(0, 3000), B = b.split('\n').slice(0, 3000);
+  const n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
+    L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  }
+  const out = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { out.push({ t: ' ', line: A[i] }); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) out.push({ t: '-', line: A[i++] });
+    else out.push({ t: '+', line: B[j++] });
+  }
+  while (i < n) out.push({ t: '-', line: A[i++] });
+  while (j < m) out.push({ t: '+', line: B[j++] });
+  return out;
+}
+
+function DiffView({ a, b, aLabel, bLabel }) {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    api(`/api/addon-diff?${qs({ a, b })}`).then(setD, (e) => setD({ error: e.message }));
+  }, [a, b]);
+  if (!d) return html`<div class="diff"><div class="skeleton" style="height:60px" /></div>`;
+  if (d.error) return html`<div class="diff ink-3">${d.error}</div>`;
+  const rows = lineDiff(d.a.text, d.b.text);
+  const changed = rows.filter((r) => r.t !== ' ').length;
+  if (!changed) return html`<div class="diff ink-3">The main file is the same — only extra files in the folder differ.</div>`;
+
+  // Collapse long runs of unchanged lines
+  const out = [];
+  for (let k = 0; k < rows.length;) {
+    if (rows[k].t !== ' ') { out.push(rows[k++]); continue; }
+    let e = k; while (e < rows.length && rows[e].t === ' ') e++;
+    const run = rows.slice(k, e);
+    if (run.length > 6) out.push(...run.slice(0, k ? 2 : 0), { t: '…', line: `${run.length - (k ? 2 : 0) - (e < rows.length ? 2 : 0)} lines the same` }, ...run.slice(e < rows.length ? -2 : run.length));
+    else out.push(...run);
+    k = e;
+  }
+  return html`
+    <div class="diff">
+      <div class="diff-key"><span class="del">− ${aLabel}</span><span class="add">+ ${bLabel}</span></div>
+      <pre>${out.map((r) => html`<div class="dl ${r.t === '+' ? 'add' : r.t === '-' ? 'del' : r.t === '…' ? 'gap' : ''}">${r.t === '…' ? '' : r.t} ${r.line}</div>`)}</pre>
+    </div>`;
+}
+
+const where = (c) => (c.scope === 'global' ? 'Everywhere (global)' : c.project.split('/').pop());
+const letter = (i) => String.fromCharCode(65 + i);
+
+function DuplicatesPage() {
+  const app = useApp();
+  const [data, setData] = useState(null);
+  const [open, setOpen] = useState({}); // "groupKey:versionIndex" → showing diff
+  const load = () => api('/api/duplicates').then(setData, (e) => app.toast(e.message, { error: true }));
+  useEffect(() => { load(); }, []);
+
+  const done = () => { load(); app.refresh(); };
+
+  const removeCopies = async (g, cs) => {
+    const gone = new Set(cs.map((c) => c.path));
+    // Versions that would have no copy left — their changes only exist in what's being removed
+    const lost = g.versions.map((v, i) => ({ v, label: letter(i) })).filter(({ v }) => v.copies.every((c) => gone.has(c.path)));
+    const removingGlobal = cs.some((c) => c.scope === 'global');
+    const inGit = cs.filter((c) => c.git === 'tracked');
+    const names = (all) => {
+      const list = [...new Set(all)];
+      return list.length > 3 ? `${list.slice(0, 3).join(', ')} and ${list.length - 3} more` : list.join(', ');
+    };
+
+    const ok = await app.confirm({
+      title: cs.length > 1 ? `Remove ${cs.length} copies of ${g.name}?` : removingGlobal ? `Remove your global ${g.name}?` : `Remove ${g.name} from ${where(cs[0])}?`,
+      body: [
+        lost.length ? `⚠️ ${lost.length === 1 ? `This is the only copy of version ${lost[0].label}` : `These are the only copies of versions ${lost.map((l) => l.label).join(', ')}`} — those changes won’t exist anywhere else. Compare first if you’re not sure.` : null,
+        removingGlobal && g.onlyGlobalIn.length ? `⚠️ ${plural(g.onlyGlobalIn.length, 'project', 'projects')} ${g.onlyGlobalIn.length === 1 ? 'has' : 'have'} no copy of ${g.name} and will lose it: ${names(g.onlyGlobalIn.map((p) => p.split('/').pop()))}.` : null,
+        !removingGlobal && g.hasGlobal ? `${cs.length === 1 ? 'That folder' : 'Those folders'} will use your global version instead.` : null,
+        !removingGlobal && !g.hasGlobal && lost.length ? `There’s no global ${g.name}, so ${cs.length === 1 ? 'that folder' : 'those folders'} won’t have it anymore.` : null,
+        inGit.length ? `${inGit.length === cs.length ? 'It’s' : `${inGit.length} of them are`} in git, so this shows up as a deleted file in ${[...new Set(inGit.map((c) => c.project.split('/').pop()))].join(', ')} — your team gets it on their next pull.` : null,
+        'It goes to your Trash, so you can put it back.',
+      ].filter(Boolean),
+      yes: lost.length || (removingGlobal && g.onlyGlobalIn.length) ? 'Remove anyway' : 'Remove',
+    });
+    if (!ok) return;
+    try { await app.remove(cs.map((c) => c.path), plural(cs.length, `copy of ${g.name}`, `copies of ${g.name}`)); done(); }
+    catch (e) { app.toast(e.message, { error: true }); }
+  };
+
+  const makeGlobal = async (g, v, label) => {
+    const ok = await app.confirm({
+      title: `Use version ${label} everywhere?`,
+      body: [
+        `This copies it to your global ${g.type === 'agent' ? 'agents' : 'commands'}, so ${g.name} works the same in every project.`,
+        g.hasGlobal ? 'Your current global version goes to the Trash first.' : null,
+        'Project copies stay put — remove them after if you want.',
+      ].filter(Boolean),
+      yes: 'Make it global', no: 'Not now', tone: 'primary',
+    });
+    if (!ok) return;
+    try {
+      const res = await api('/api/addon/promote', { path: v.copies[0].path });
+      app.toast(`${g.name} is now global ✨`, {
+        ms: 10000,
+        action: { label: 'Undo', run: async () => { await api('/api/addon/unpromote', res); app.toast('Put back ✨'); done(); } },
+      });
+      done();
+    } catch (e) { app.toast(e.message, { error: true }); }
+  };
+
+  const header = html`
+    <${Back} href="#/" label="All tools" />
+    <div class="head">
+      <${Art} kind="addons" size=${72} icon=${40} />
+      <div><h1>Duplicate add-ons</h1><div class="sub">Same skill, command or agent in more than one place</div></div>
+    </div>`;
+
+  if (!data) return html`${header}<${Loading} />`;
+  if (!data.groups.length) return html`${header}<div class="card empty"><${Logo} size=${72} /><h2>No duplicates 🎉</h2>Every add-on lives in one place.</div>`;
+
+  return html`
+    ${header}
+    <${Tip}>
+      <b>${data.stats.addons}</b> add-ons live in more than one place, and <b>${data.stats.drifted}</b> of them have drifted apart —
+      so which version runs depends on the folder you’re in. Keep one source: <b>generic ones global</b>, <b>repo-specific ones in that repo</b>.
+    <//>
+
+    ${data.groups.map((g) => {
+      const base = g.versions[0];
+      const locals = g.versions.flatMap((v) => v.copies).filter((c) => c.scope === 'project' && c.git !== 'tracked');
+      return html`
+        <section class="card dupe" key=${g.key}>
+          <div class="dupe-head">
+            <span class="ic" style="background:var(--addons-soft);color:var(--addons)">${ART.addons(22)}</span>
+            <div class="body">
+              <h3>${g.name}</h3>
+              ${g.description && html`<div class="s truncate">${g.description}</div>`}
+            </div>
+            <span class="pill ${g.versions.length > 1 ? 'warn' : ''}">${plural(g.copies, 'copy', 'copies')} · ${g.versions.length > 1 ? `${g.versions.length} different versions` : 'all the same'}</span>
+          </div>
+
+          ${g.hasGlobal && locals.length > 0 && html`
+            <div class="quickfix">
+              <span>💡 ${plural(locals.length, 'local copy', 'local copies')} not in git. Use your global one instead?</span>
+              <button class="btn small primary" onClick=${() => removeCopies(g, locals)}>Remove ${locals.length === 1 ? 'it' : `all ${locals.length}`}</button>
+            </div>`}
+
+          ${g.versions.map((v, vi) => {
+            const label = letter(vi);
+            const key = `${g.key}:${vi}`;
+            const isGlobal = v.copies.some((c) => c.scope === 'global');
+            return html`
+              <div class="version">
+                <div class="version-head">
+                  <b>Version ${label}</b>
+                  <span class="ink-3">${isGlobal ? 'your global one' : plural(v.copies.length, 'place', 'places')} · changed ${when(v.modified)}</span>
+                  ${v.copies.length === 1 && g.versions.length > 1 && html`<span class="tag needed" title="Removing this copy loses this version">Only copy</span>`}
+                  <div class="grow" />
+                  ${vi > 0 && html`<button class="btn small" onClick=${() => setOpen((o) => ({ ...o, [key]: !o[key] }))}>${open[key] ? 'Hide' : `Compare with ${letter(0)}`}</button>`}
+                  ${!isGlobal && html`<button class="btn small" onClick=${() => makeGlobal(g, v, label)}>Use everywhere</button>`}
+                </div>
+                ${open[key] && html`<${DiffView} a=${base.copies[0].path} b=${v.copies[0].path} aLabel=${`Version ${letter(0)}`} bLabel=${`Version ${label}`} />`}
+                <div class="locs">
+                  ${v.copies.map((c) => html`
+                    <div class="loc" key=${c.path} title=${tilde(c.path)}>
+                      <span class="loc-name">${where(c)}</span>
+                      ${c.git === 'tracked' && html`<span class="tag needed" title="Committed to the repo — shared with your team">In git · team</span>`}
+                      ${c.scope === 'project' && c.git !== 'tracked' && html`<span class="tag toss" title="Not in git — only on this computer">Only here</span>`}
+                      ${app.details && html`<span class="mono ink-3 truncate">${tilde(c.path)}</span>`}
+                      <button class="btn quiet small" onClick=${() => removeCopies(g, [c])}>${c.scope === 'global' ? 'Remove global copy' : `Remove from ${where(c)}`}</button>
+                    </div>`)}
+                </div>
+              </div>`;
+          })}
+        </section>`;
+    })}`;
 }
 
 // ---------- support ----------
@@ -278,7 +459,7 @@ function Support() {
           </div>
 
           ${sent ? html`
-            <${Byte} size=${72} mood="happy" />
+            <${Logo} size=${72} />
             <p>Your mail app should be open with the message ready. Hit send there and it comes straight to me.</p>
             <p class="ink-3 small">Mail app didn’t open? Email <b class="mono">${SUPPORT_EMAIL}</b></p>
             <div class="modal-actions"><button class="btn primary" onClick=${close}>Done</button></div>`
@@ -309,16 +490,16 @@ function Support() {
 
 // ---------- shared ----------
 
-function Hello({ children, mood, cta }) {
+function Hello({ children, cta }) {
   return html`
     <section class="card hello">
-      <${Byte} size=${64} mood=${mood} />
+      <${Logo} size=${64} />
       <div class="say"><div class="bubble">${children}</div></div>
       ${cta && html`<div class="cta">${cta}</div>`}
     </section>`;
 }
 
-const Tip = ({ children }) => html`<div class="tip"><${Byte} size=${38} /><div class="bubble">${children}</div></div>`;
+const Tip = ({ children }) => html`<div class="tip"><${Logo} size=${38} /><div class="bubble">${children}</div></div>`;
 const Back = ({ href, label }) => html`<a class="back" href=${href}>${G.back} ${label}</a>`;
 const Loading = () => html`<div class="card pad">${[70, 50, 60].map((w) => html`<div class="skeleton" style="height:20px;width:${w}%;margin:12px 0" />`)}</div>`;
 
@@ -347,7 +528,7 @@ function junkList(ov, toolId) {
 
 function HomePage() {
   const { ov, mcp, details } = useApp();
-  if (!ov) return html`<${Hello} mood="think">Let me look around your Mac…<//><${Loading} />`;
+  if (!ov) return html`<${Hello}>Let me look around your Mac…<//><${Loading} />`;
 
   const found = ov.tools.filter((t) => t.exists && t.size > 0);
   // The projects card goes last: it's a different kind of place, not an AI tool
@@ -392,6 +573,7 @@ function HomePage() {
 
     <div class="links">
       <a class="btn" href="#/connections">${ART.plug(18)} All connections</a>
+      <a class="btn" href="#/duplicates">${ART.addons(18)} Duplicate add-ons</a>
       <a class="btn" href="#/deleted">${ART.trash(18)} Recently deleted</a>
     </div>
 
@@ -496,6 +678,8 @@ function ItemList({ tool, cats, kind }) {
   if (!lists) return html`<${Loading} />`;
 
   const readonly = lists.find((l) => l.category.readonly)?.category.readonly;
+  const copies = {};
+  if (kind === 'addons') for (const i of all) if (i.title) copies[i.title] = (copies[i.title] || 0) + 1;
   const sel = shown.filter((i) => picked.has(i.path));
   const selSize = sel.reduce((a, i) => a + i.size, 0);
   const toggle = (p) => setPicked((s) => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n; });
@@ -517,7 +701,7 @@ function ItemList({ tool, cats, kind }) {
   const del = async () => {
     const what = plural(sel.length, K.one, K.many);
     const ok = await app.confirm({
-      mood: 'think', title: `Delete ${what}?`,
+      title: `Delete ${what}?`,
       body: [`That’s ${bytes(selSize)}.`, 'They go to your Trash, so you can put them back.'],
       yes: 'Delete',
     });
@@ -544,7 +728,7 @@ function ItemList({ tool, cats, kind }) {
       </div>`}
 
     ${!shown.length
-      ? html`<div class="card empty"><${Byte} size=${72} mood="think" /><h2>${all.length ? 'No matches' : `No ${K.many} yet`}</h2>${all.length ? 'Try another word.' : ''}</div>`
+      ? html`<div class="card empty"><${Logo} size=${72} /><h2>${all.length ? 'No matches' : `No ${K.many} yet`}</h2>${all.length ? 'Try another word.' : ''}</div>`
       : html`
         <div class="card list">
           ${!readonly && shown.length > 1 && html`
@@ -568,7 +752,9 @@ function ItemList({ tool, cats, kind }) {
                   </span>`}
                 <span class="ic" style="background:var(--${kind}-soft);color:var(--${kind})">${ART[kind](22)}</span>
                 <div class="body">
-                  <div class="t truncate">${label(i)}</div>
+                  <div class="t truncate">${label(i)}
+                    ${copies[i.title] > 1 && html` <a class="pill dupe-pill" href="#/duplicates" onClick=${(e) => e.stopPropagation()}
+                      title="Same add-on in more than one place">in ${copies[i.title]} places</a>`}</div>
                   <div class="s truncate">${[
                     i.subtitle,
                     i.group && (!i.subtitle || tool.perProject) ? `in ${i.group.split('/').pop()}` : null,
@@ -615,7 +801,7 @@ function JunkChecklist({ toolId }) {
 
   if (done) return html`
     <div class="card done">
-      <${Byte} size=${96} mood="happy" />
+      <${Logo} size=${96} />
       <div class="big-num">${bytes(done.size)}</div>
       <h2>freed up! 🎉</h2>
       <p class="ink-2">Moved ${plural(done.count, 'thing', 'things')} to the Trash.</p>
@@ -625,7 +811,7 @@ function JunkChecklist({ toolId }) {
       </div>
     </div>`;
 
-  if (!items.length) return html`<div class="card empty"><${Byte} size=${80} mood="happy" /><h2>All clean!</h2>No junk to clear right now.</div>`;
+  if (!items.length) return html`<div class="card empty"><${Logo} size=${80} /><h2>All clean!</h2>No junk to clear right now.</div>`;
 
   let lastTool = null;
   return html`
@@ -683,13 +869,13 @@ function Connections({ toolId }) {
   const tools = Object.fromEntries((app.ov?.tools || []).map((t) => [t.id, t]));
   const list = (app.mcp || []).filter((m) => !toolId || m.tool === toolId);
   if (!app.mcp) return html`<${Loading} />`;
-  if (!list.length) return html`<div class="card empty"><${Byte} size=${72} mood="think" /><h2>No connections</h2>Nothing plugged in yet.</div>`;
+  if (!list.length) return html`<div class="card empty"><${Logo} size=${72} /><h2>No connections</h2>Nothing plugged in yet.</div>`;
 
   const byTool = list.reduce((acc, m) => ((acc[m.tool] ||= []).push(m), acc), {});
 
   const remove = async (m) => {
     const ok = await app.confirm({
-      mood: 'think', title: `Unplug “${m.name}”?`,
+      title: `Unplug “${m.name}”?`,
       body: [`${tools[m.tool]?.name || m.tool} won’t be able to use it anymore.`, 'We save a backup first. Restart the tool after.'],
       yes: 'Unplug',
     });
@@ -742,7 +928,7 @@ function DeletedPage() {
     <${Back} href="#/" label="Home" />
     <div class="head"><${Art} kind="trash" size=${72} icon=${40} radius=${22} /><div><h1>Recently deleted</h1><div class="sub">Changed your mind? Put things back.</div></div></div>
     ${!list && html`<${Loading} />`}
-    ${list && !list.length && html`<div class="card empty"><${Byte} size=${80} mood="happy" /><h2>Nothing deleted yet</h2>Things you delete show up here.</div>`}
+    ${list && !list.length && html`<div class="card empty"><${Logo} size=${80} /><h2>Nothing deleted yet</h2>Things you delete show up here.</div>`}
     ${list?.length > 0 && html`
       <div class="card list">
         ${list.map((b) => html`
@@ -767,7 +953,7 @@ function Drawer({ item, tool, kind, readonly, onClose, onDeleted }) {
 
   const del = async () => {
     const ok = await app.confirm({
-      mood: 'think', title: `Delete “${cur.label || cur.name}”?`,
+      title: `Delete “${cur.label || cur.name}”?`,
       body: ['It goes to your Trash, so you can put it back.'], yes: 'Delete',
     });
     if (!ok) return;
@@ -826,10 +1012,10 @@ function ChatView({ path }) {
           ? html`<div class="msg-tool"><b>${m.tool}</b><span class="truncate">${m.text}</span></div>`
           : html`
             <div class="msg-row ${m.role}">
-              ${m.role === 'assistant' && html`<${Byte} size=${32} />`}
+              ${m.role === 'assistant' && html`<${Logo} size=${32} />`}
               <div class="msg">${m.text}</div>
             </div>`)}
-        ${!msgs.length && html`<div class="empty"><${Byte} size=${64} mood="think" /><h2>Empty chat</h2>Nothing was said in this one.</div>`}
+        ${!msgs.length && html`<div class="empty"><${Logo} size=${64} /><h2>Empty chat</h2>Nothing was said in this one.</div>`}
       </div>
     </div>`;
 }
@@ -868,7 +1054,7 @@ function FileView({ item, tool, kind, readonly, onOpen }) {
     return () => removeEventListener('keydown', on);
   });
 
-  if (err) return html`<div class="drawer-body"><div class="empty"><${Byte} size=${64} mood="think" /><h2>Can’t open this one</h2>${err}</div></div>`;
+  if (err) return html`<div class="drawer-body"><div class="empty"><${Logo} size=${64} /><h2>Can’t open this one</h2>${err}</div></div>`;
   if (!data) return html`<div class="drawer-body"><${Loading} /></div>`;
 
   if (data.type === 'dir') return html`
@@ -891,7 +1077,7 @@ function FileView({ item, tool, kind, readonly, onOpen }) {
     </div></div>`;
 
   if (data.type === 'binary') return html`
-    <div class="drawer-body"><div class="empty"><${Byte} size=${64} mood="think" /><h2>Can’t show this one</h2>It’s not text — only ${tool?.name || 'the tool'} can read it.</div></div>`;
+    <div class="drawer-body"><div class="empty"><${Logo} size=${64} /><h2>Can’t show this one</h2>It’s not text — only ${tool?.name || 'the tool'} can read it.</div></div>`;
 
   const isCode = /\.(json|toml|ya?ml|jsonl)$/i.test(target);
   const canEdit = data.editable && !readonly;
@@ -902,6 +1088,7 @@ function FileView({ item, tool, kind, readonly, onOpen }) {
       ${editing
         ? html`<textarea class="editor" value=${text} spellcheck=${false} onInput=${(e) => setText(e.target.value)} aria-label="Edit" />`
         : html`<div class="reader ${isCode ? 'mono' : ''}">${data.content || html`<span class="ink-3">Empty</span>`}</div>`}
+      ${!editing && html`<${Meaning} info=${explain(target, data.content, kind)} />`}
     </div>
     ${canEdit && html`
       <div class="drawer-foot" style="border-top:0;padding-top:0">
@@ -915,20 +1102,32 @@ function FileView({ item, tool, kind, readonly, onOpen }) {
       </div>`}`;
 }
 
+/** "What this means" box under a file. `code` spans in the text become <code>. */
+function Meaning({ info }) {
+  if (!info) return null;
+  const fmt = (t) => t.split(/`([^`]+)`/).map((part, i) => (i % 2 ? html`<code>${part}</code>` : part));
+  return html`
+    <div class="meaning">
+      <div class="meaning-h">In plain English</div>
+      ${info.what && html`<p class="meaning-what">${fmt(info.what)}</p>`}
+      ${info.points.length > 0 && html`<ul>${info.points.map((p) => html`<li class=${p.startsWith('• ') ? 'sub' : ''}>${fmt(p.replace(/^• /, ''))}</li>`)}</ul>`}
+    </div>`;
+}
+
 // ---------- modal ----------
 
-function Modal({ title, body = [], yes = 'OK', mood = 'think', onDone }) {
+function Modal({ title, body = [], yes = 'OK', no = 'Keep it', tone = 'danger', onDone }) {
   const cancel = useRef();
   useEffect(() => { cancel.current?.focus(); }, []);
   return html`
     <div class="modal-wrap" onClick=${() => onDone(false)}>
       <div class="card modal" role="alertdialog" aria-modal="true" aria-label=${title} onClick=${(e) => e.stopPropagation()}>
-        <${Byte} size=${64} mood=${mood} />
+        <${Logo} size=${64} />
         <h2>${title}</h2>
         ${[].concat(body).map((p) => html`<p>${p}</p>`)}
         <div class="modal-actions">
-          <button class="btn" ref=${cancel} onClick=${() => onDone(false)}>Keep it</button>
-          <button class="btn danger" onClick=${() => onDone(true)}>${yes}</button>
+          <button class="btn" ref=${cancel} onClick=${() => onDone(false)}>${no}</button>
+          <button class="btn ${tone}" onClick=${() => onDone(true)}>${yes}</button>
         </div>
       </div>
     </div>`;

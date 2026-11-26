@@ -11,6 +11,7 @@ import { overview, listCategory } from './scan.js';
 import { readChat, listMcp } from './readers.js';
 import { readFileForView, trash, restore, save, removeMcp, guard, trashHistory } from './actions.js';
 import { TOOL_BY_ID } from './tools.js';
+import { duplicates, addonDiff, promote, unpromote } from './dupes.js';
 
 const HOST = '127.0.0.1';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -55,6 +56,14 @@ app.get('/api/chat', async (c) => c.json(await readChat(await guard(c.req.query(
 app.get('/api/mcp', async (c) => c.json(await listMcp()));
 
 app.get('/api/trash', async (c) => c.json(await trashHistory()));
+
+app.get('/api/duplicates', async (c) => c.json(await duplicates()));
+app.get('/api/addon-diff', async (c) => c.json(await addonDiff(c.req.query('a'), c.req.query('b'))));
+app.post('/api/addon/promote', async (c) => c.json(await promote((await c.req.json()).path)));
+app.post('/api/addon/unpromote', async (c) => {
+  const { created, replacedBatch } = await c.req.json();
+  return c.json(await unpromote(created, replacedBatch));
+});
 
 // ---------- write ----------
 

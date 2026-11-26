@@ -14,9 +14,7 @@ Runs locally. Nothing leaves your machine.
 
 ▶️ [Watch in full quality](docs/demo.mp4)
 
-| Home | Inside a tool |
-| --- | --- |
-| ![Home: every AI tool on your Mac](docs/home.png) | ![Inside Claude Code: chats, memory, rules and more](docs/tool.png) |
+![Home: every AI tool on your Mac](docs/home.png)
 
 ## Run
 
@@ -48,6 +46,10 @@ Fills a fake home folder (`/tmp/manage-ai-demo`) with made-up chats, memory and 
 Claude Code · Codex · Gemini CLI · Copilot CLI · Copilot in VS Code · Cursor · Windsurf/Codeium
 
 Also looks **inside every project and worktree** your AI tools have opened, for the rules, skills, commands, agents and settings that live there (`CLAUDE.md`, `AGENTS.md`, `.claude/skills`, `.cursor/rules`, `.github/prompts`…). It only touches those AI files, never your code.
+
+**Duplicate add-ons.** Same skill or command copied into a bunch of repos and worktrees, drifting apart? See every copy, diff the versions, make one global, and remove the rest — with warnings before you lose the only copy of something. It flags local copies that aren't in git, so you know what's safe to toss and what your team shares. Making one global is one-click undo.
+
+**In plain English.** Open any settings, rules or MCP file and get a short explanation under it: what it's for, what your AI can do without asking, what it connects to.
 
 Tool definitions live in `server/tools.js` — add a tool by adding an entry.
 

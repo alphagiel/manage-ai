@@ -24,7 +24,13 @@ async function frontmatter(file) {
     await fh.close();
     const text = buf.subarray(0, bytesRead).toString('utf8');
     const fm = text.match(/^---\n([\s\S]*?)\n---/);
-    const get = (k) => fm?.[1].match(new RegExp(`^${k}:\\s*(.+)$`, 'm'))?.[1].replace(/^["']|["']$/g, '').replace(/\\"/g, '"').trim();
+    const get = (k) => {
+      const m = fm?.[1].match(new RegExp(`^${k}:[ \\t]*(.*)$((?:\\n[ \\t]+.*)*)`, 'm'));
+      if (!m) return undefined;
+      // "description: >" or "|" means the text is on the indented lines below
+      const v = /^[>|][-+]?$/.test(m[1].trim()) || !m[1].trim() ? m[2].replace(/\s+/g, ' ') : m[1];
+      return v.replace(/^\s*["']|["']\s*$/g, '').replace(/\\"/g, '"').trim() || undefined;
+    };
     const firstLine = text.replace(/^---\n[\s\S]*?\n---\n?/, '').split('\n').find((l) => l.trim() && !l.startsWith('#'))?.trim();
     return { name: get('name'), description: get('description') || firstLine };
   } catch { return {}; }

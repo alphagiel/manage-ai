@@ -185,6 +185,9 @@ async function claude() {
   await write(path.join(rp, 'AGENTS.md'), '# recipe-box\n\nSame rules as CLAUDE.md, for Codex.\n', 9);
   await write(path.join(rp, '.claude', 'commands', 'seed-db.md'), '---\ndescription: Fill the database with sample recipes\n---\n\nRun db/seed.sql.\n', 7);
   await write(path.join(rp, '.claude', 'settings.local.json'), json({ permissions: { allow: ['Bash(pnpm dev)'] } }), 7);
+  // A drifted copy of the global /write-tests skill, so "Duplicate add-ons" has something to show
+  await write(path.join(rp, '.claude', 'skills', 'write-tests', 'SKILL.md'),
+    '---\nname: write-tests\ndescription: Write tests for a file, matching the repo style\n---\n\n# Write tests\n\n1. Read the file.\n2. Use Jest (we moved to Vitest since).\n3. Cover the happy path.\n', 45);
   const wt = project('recipe-box-worktree-old-search');
   await write(path.join(wt, 'CLAUDE.md'), '# recipe-box (search branch)\n\n- Use the OLD search API (v1). We dropped this months ago.\n', 60);
   await write(path.join(wt, '.claude', 'skills', 'search-v1', 'SKILL.md'), '---\nname: search-v1\ndescription: Query the old v1 search API\n---\n\nUse /api/v1/search.\n', 60);

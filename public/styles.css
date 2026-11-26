@@ -1,4 +1,4 @@
-/* manage-ai — "Byte" theme.
+/* manage-ai theme.
    Friendly, rounded, roomy. Soft pastel color per kind of stuff.
    One strong accent (purple) for the main action on each screen. */
 
@@ -127,9 +127,9 @@ a { color: var(--accent-ink); text-decoration: none; }
 .card { background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); border: 1px solid var(--line); }
 .pad { padding: 24px; }
 
-/* Byte speaking */
+/* Logo + speech bubble */
 .hello { display: flex; align-items: center; gap: 18px; padding: 22px 24px; margin-bottom: 32px; }
-.hello .byte { flex: none; animation: bob 4s ease-in-out infinite; }
+.hello .mark { flex: none; }
 .hello .say { flex: 1; min-width: 0; }
 .bubble {
   position: relative; display: inline-block; max-width: 100%;
@@ -142,7 +142,6 @@ a { color: var(--accent-ink); text-decoration: none; }
 .bubble b { font-weight: 750; }
 .hello .cta { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .hello .cta small { color: var(--ink-3); font-size: 12px; }
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
 h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin: 0; line-height: 1.2; }
 h2 { font-size: 18px; font-weight: 750; letter-spacing: -0.01em; margin: 0; }
@@ -350,7 +349,7 @@ h3 { font-size: 15px; font-weight: 700; margin: 0; }
 }
 .support-tab:hover { color: var(--accent); transform: translateY(-2px); }
 .modal.support { text-align: left; width: min(480px, 100%); }
-.modal.support .byte { display: block; margin: 4px auto 8px; }
+.modal.support .mark { display: block; margin: 4px auto 8px; }
 .support-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .support-head h2 { flex: 1; margin: 0; }
 .support-kinds { display: grid; gap: 10px; margin-top: 16px; }
@@ -365,3 +364,45 @@ h3 { font-size: 15px; font-weight: 700; margin: 0; }
 .support-text { width: 100%; min-height: 140px; margin: 10px 0 6px; resize: vertical; }
 .small { font-size: 13px; }
 @media (max-width: 640px) { .support-tab { right: 12px; } }
+
+/* ---------- duplicates ---------- */
+.dupe { padding: 18px; margin-bottom: 14px; }
+.dupe-head { display: flex; align-items: center; gap: 14px; }
+.dupe-head .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.dupe-head .body { flex: 1; min-width: 0; }
+.dupe-head h3 { margin: 0; font-size: 17px; }
+.dupe-head .s { color: var(--ink-3); font-size: 13.5px; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.quickfix { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding: 10px 14px; border-radius: var(--r-md); background: var(--accent-soft); font-size: 14px; }
+.quickfix span { flex: 1; min-width: 200px; }
+.version { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
+.version-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.locs { display: grid; gap: 4px; margin-top: 8px; }
+.loc { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; font-size: 14px; min-width: 0; }
+.loc:hover { background: var(--hover); }
+.loc-name { font-weight: 650; }
+.loc .mono { flex: 1; min-width: 0; }
+.loc .btn { margin-left: auto; }
+.diff { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 13px; }
+.diff-key { display: flex; gap: 16px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 650; }
+.diff pre { margin: 0; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; }
+.dl { padding: 0 12px; white-space: pre-wrap; word-break: break-word; }
+.dl.add, .diff-key .add { background: rgb(34 160 90 / .13); color: #1f8a4c; }
+.dl.del, .diff-key .del { background: rgb(220 60 60 / .12); color: #c23b3b; }
+.diff-key .add, .diff-key .del { background: none; }
+.dl.gap { color: var(--ink-3); background: var(--hover); font-style: italic; }
+.dupe-pill { margin-left: 8px; font-size: 12px; padding: 2px 8px; vertical-align: 2px; background: var(--warn-soft); color: var(--warn); text-decoration: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dl.add, :root:not([data-theme="light"]) .diff-key .add { color: #5fd68f; }
+  :root:not([data-theme="light"]) .dl.del, :root:not([data-theme="light"]) .diff-key .del { color: #ff8a8a; }
+}
+
+/* "In plain English" box under a file */
+.meaning { margin-top: 14px; padding: 14px 18px; border-radius: var(--r-md); background: var(--accent-soft); color: var(--ink); font-size: 14.5px; line-height: 1.5; }
+.meaning-h { font-size: 12px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 6px; }
+.meaning-what { margin: 0 0 4px; font-weight: 600; }
+.meaning ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.meaning li { margin: 3px 0; }
+.meaning li.sub { padding-left: 16px; position: relative; color: var(--ink-2); }
+.meaning li.sub::before { content: '•'; position: absolute; left: 4px; color: var(--accent-2); }
+.meaning code { font-family: var(--mono); font-size: 13px; background: rgb(127 127 127 / .16); padding: 1px 5px; border-radius: 5px; }

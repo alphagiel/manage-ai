@@ -1,31 +1,16 @@
-// Hand-drawn art for manage-ai: Byte (our robot buddy) + one icon per kind of stuff.
+// Hand-drawn art for manage-ai: the logo mark + one icon per kind of stuff.
 // Icons are duotone: `currentColor` for the shape, white for details.
 
 import { html } from '/vendor/preact.js';
 
-/** Byte — mood: "hi" | "happy" | "think" */
-export function Byte({ size = 56, mood = 'hi' }) {
-  const eyes = mood === 'happy'
-    ? html`<path d="M22.5 29.5q3.5-4 7 0M34.5 29.5q3.5-4 7 0" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round"/>`
-    : mood === 'think'
-      ? html`<circle cx="26" cy="28" r="3.2" fill="#fff"/><circle cx="38" cy="26.5" r="3.2" fill="#fff"/>`
-      : html`<circle cx="26" cy="28" r="3.4" fill="#fff"/><circle cx="38" cy="28" r="3.4" fill="#fff"/>`;
-  const mouth = mood === 'think'
-    ? html`<path d="M29 35h6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>`
-    : html`<path d="M27 33.5q5 4.5 10 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+/** The manage-ai mark: a dashboard tile. */
+export function Logo({ size = 56 }) {
   return html`
-    <svg class="byte" width=${size} height=${size} viewBox="0 0 64 64" aria-hidden="true">
-      <line x1="32" y1="5" x2="32" y2="13" stroke="#7c70f2" stroke-width="2.6" stroke-linecap="round"/>
-      <circle cx="32" cy="5" r="3.6" fill="#ff8fb1"/>
-      <rect x="5" y="23" width="8" height="15" rx="4" fill="#6a5de6"/>
-      <rect x="51" y="23" width="8" height="15" rx="4" fill="#6a5de6"/>
-      <path d="M19 50q0-5 5-5h16q5 0 5 5v9q0 3-3 3H22q-3 0-3-3z" fill="#7c70f2"/>
-      <circle cx="32" cy="54" r="2.4" fill="#c9c3ff"/>
-      <rect x="10" y="11" width="44" height="36" rx="15" fill="#aba3ff"/>
-      <rect x="15.5" y="18" width="33" height="22" rx="11" fill="#2a2460"/>
-      ${eyes}${mouth}
-      <circle cx="18" cy="42" r="2" fill="#ff8fb1" opacity=".55"/>
-      <circle cx="46" cy="42" r="2" fill="#ff8fb1" opacity=".55"/>
+    <svg class="mark" width=${size} height=${size} viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="#5b4fe0"/>
+      <rect x="12" y="12" width="17" height="40" rx="6" fill="#fff"/>
+      <rect x="34" y="12" width="18" height="18" rx="6" fill="#d6d1ff"/>
+      <rect x="34" y="34" width="18" height="18" rx="6" fill="#8b80f5"/>
     </svg>`;
 }
 
