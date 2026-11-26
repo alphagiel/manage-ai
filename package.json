@@ -1,0 +1,19 @@
+{
+  "name": "manage-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local dashboard for everything AI coding tools save on your machine.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "hono": "^4.13.22",
+    "htm": "^3.1.1"
+  }
+}
