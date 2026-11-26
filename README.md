@@ -4,7 +4,7 @@
 
 You've been living in Claude Code, Codex, Copilot, Cursor. Juggling agents, spinning up worktrees, jumping between tickets. Every session left something behind: chats you'll never reopen, memories about projects you shipped months ago, rules written for a codebase that no longer exists, MCP servers you forgot you connected.
 
-It all still loads. It all still steers your AI. And it's been piling up since day one.
+Some of it loads into every session, and stale rules still steer your AI. The rest just sits on your disk, holding old code and convos. And it's been piling up since day one.
 
 **manage-ai is the one-stop shop for everything your AI tools saved on your machine.** See it, read it, edit it, and clear out the stale stuff — chats, memory, rules, settings, MCP connections, skills, plugins and caches.
 
