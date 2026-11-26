@@ -1,8 +1,14 @@
 # manage-ai
 
-One local dashboard for everything AI coding tools save on your Mac.
+**Your AI has been taking notes on you. Ever checked what it kept?**
 
-See it, search it, edit it, clean it up — chats, memory, rules, settings, MCP servers, skills, plugins, caches.
+You've been living in Claude Code, Codex, Copilot, Cursor. Juggling agents, spinning up worktrees, jumping between tickets. Every session left something behind: chats you'll never reopen, memories about projects you shipped months ago, rules written for a codebase that no longer exists, MCP servers you forgot you connected.
+
+It all still loads. It all still steers your AI. And it's been piling up since day one.
+
+**manage-ai is the one-stop shop for everything your AI tools saved on your machine.** See it, read it, edit it, and clear out the stale stuff — chats, memory, rules, settings, MCP connections, skills, plugins and caches.
+
+Runs locally. Nothing leaves your machine.
 
 ![manage-ai demo](docs/demo.gif)
 
