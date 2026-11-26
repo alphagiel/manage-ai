@@ -30,6 +30,14 @@ async function frontmatter(file) {
   } catch { return {}; }
 }
 
+/** Gemini commands are TOML: read `description = "..."`. */
+async function tomlDescription(file) {
+  try {
+    const t = await fs.readFile(file, 'utf8');
+    return { description: t.match(/^description\s*=\s*["'](.+?)["']\s*$/m)?.[1] };
+  } catch { return {}; }
+}
+
 /** sessionId → chat title, so "file-history/<uuid>" can say which chat it came from. */
 let sessionIndex = null;
 async function sessionTitles() {
@@ -64,10 +72,31 @@ export async function describe(toolId, catId, p, st) {
     return { title: humanize(fm.name || name), subtitle: fm.description || null };
   }
 
+  if (toolId === 'projects' && catId === 'rules') {
+    const parent = path.basename(path.dirname(p));
+    const known = {
+      'CLAUDE.md': 'CLAUDE.md · Claude Code', 'CLAUDE.local.md': 'CLAUDE.local.md · your private Claude rules',
+      'AGENTS.md': 'AGENTS.md · Codex and others', 'GEMINI.md': 'GEMINI.md · Gemini',
+      'copilot-instructions.md': 'Copilot instructions', '.cursorrules': 'Cursor rules', '.windsurfrules': 'Windsurf rules',
+    };
+    const fm = await frontmatter(p);
+    const title = known[name]
+      || (parent === 'rules' && p.includes(`${path.sep}.cursor${path.sep}`) ? `Cursor rule: ${humanize(name.replace(/\.mdc$/, ''))}`
+        : parent === 'rules' ? `Claude rule: ${humanize(name)}`
+          : parent === 'instructions' ? `Copilot instruction: ${humanize(name.replace(/\.instructions\.md$/, ''))}`
+            : name);
+    return { title, subtitle: fm.description || null };
+  }
+
+  if (toolId === 'projects' && catId === 'settings') {
+    return { title: name === 'settings.local.json' ? 'Claude settings (just you)' : 'Claude settings (shared)', subtitle: null };
+  }
+
   if (catId === 'skills' || catId === 'commands' || catId === 'agents') {
     const file = st.isDirectory() ? path.join(p, 'SKILL.md') : p;
-    const fm = await frontmatter(file);
-    return { title: '/' + (fm.name || name.replace(/\.md$/, '')), subtitle: fm.description || null };
+    const fm = name.endsWith('.toml') ? await tomlDescription(file) : await frontmatter(file);
+    const bare = name.replace(/\.(prompt\.md|agent\.md|md|mdc|toml)$/, '');
+    return { title: '/' + (fm.name || bare), subtitle: fm.description || null };
   }
 
   if (toolId === 'claude' && catId === 'undo') {

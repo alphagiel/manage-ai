@@ -100,6 +100,7 @@ export const TOOLS = [
     categories: [
       { id: 'chats', label: 'Chats', kind: 'chats', safety: 'careful', about: 'Session transcripts.', include: ['sessions', 'archived_sessions'], items: ['sessions/*/*/*/*.jsonl', 'archived_sessions/*.jsonl'] },
       { id: 'rules', label: 'Rules', kind: 'text', safety: 'keep', about: 'Your instructions (AGENTS.md).', include: ['AGENTS.md'] },
+      { id: 'commands', label: 'Custom prompts', kind: 'files', safety: 'careful', about: 'Saved prompts you run as /name.', include: ['prompts'], items: ['prompts/*'] },
       { id: 'settings', label: 'Settings', kind: 'text', safety: 'keep', about: 'Config, including MCP servers.', include: ['config.toml'] },
       { id: 'auth', label: 'Login', kind: 'secret', safety: 'keep', about: 'Your login token. Hidden by default.', include: ['auth.json'] },
       { id: 'history', label: 'Prompt history', kind: 'text', safety: 'safe', about: 'Every prompt you typed.', include: ['history.jsonl'] },
@@ -115,6 +116,7 @@ export const TOOLS = [
     categories: [
       { id: 'chats', label: 'Chats', kind: 'chats', safety: 'careful', about: 'Saved sessions, per project.', include: ['tmp'], items: ['tmp/*/chats/*.json'] },
       { id: 'rules', label: 'Rules', kind: 'text', safety: 'keep', about: 'Your instructions (GEMINI.md).', include: ['GEMINI.md'] },
+      { id: 'commands', label: 'Custom commands', kind: 'files', safety: 'careful', about: 'Your custom slash commands.', include: ['commands'], items: ['commands/*'] },
       { id: 'settings', label: 'Settings', kind: 'text', safety: 'keep', about: 'Config, including MCP servers.', include: ['settings.json'] },
       { id: 'auth', label: 'Login', kind: 'secret', safety: 'keep', about: 'Your login token. Hidden by default.', include: ['oauth_creds.json', 'google_accounts.json'] },
     ],
@@ -129,6 +131,7 @@ export const TOOLS = [
       { id: 'chats', label: 'Sessions', kind: 'files', safety: 'careful', about: 'Saved session state, one folder per session.', include: ['session-state'], items: ['session-state/*'] },
       { id: 'settings', label: 'Settings', kind: 'text', safety: 'keep', about: 'Config and MCP servers.', include: ['config.json', 'mcp-config.json'] },
       { id: 'plugins', label: 'Plugins', kind: 'files', safety: 'careful', about: 'Installed plugins.', include: ['installed-plugins'], items: ['installed-plugins/*'] },
+      { id: 'agents', label: 'Custom agents', kind: 'files', safety: 'careful', about: 'Your custom agents.', include: ['agents'], items: ['agents/*'] },
       { clean: true, id: 'logs', label: 'Logs', kind: 'files', safety: 'safe', about: 'Debug logs.', include: ['logs'], items: ['logs/*'] },
       { clean: true, id: 'cache', label: 'Locks & temp', kind: 'files', safety: 'safe', about: 'IDE connection lock files.', include: ['ide'], items: ['ide/*'] },
     ],
@@ -170,6 +173,30 @@ export const TOOLS = [
       { id: 'settings', label: 'Settings & MCP', kind: 'text', safety: 'keep', about: 'MCP servers and workflows.', include: ['windsurf/mcp_config.json', 'windsurf/workflows'] },
       { clean: true, id: 'index', label: 'Code index', kind: 'files', safety: 'safe', about: 'Search index of your code. Rebuilds itself.', include: ['database', 'context_state', 'code_tracker', 'implicit', 'brain'] },
       { id: 'browser', label: 'Built-in browser', kind: 'files', safety: 'safe', about: 'Browser profile used by Windsurf.', include: ['ws-browser', 'ws-browser-profile'] },
+    ],
+  },
+  {
+    id: 'projects',
+    name: 'Inside your projects',
+    color: '#e8590c',
+    root: null,
+    perProject: true, // patterns are relative to each project folder your AI tools have opened
+    categories: [
+      {
+        id: 'rules', label: 'Project rules', kind: 'text', safety: 'keep',
+        about: 'Rules files that live inside each project and load when you work there.',
+        include: [
+          'CLAUDE.md', 'CLAUDE.local.md', '.claude/CLAUDE.md', '.claude/rules/*', 'AGENTS.md', 'GEMINI.md',
+          '.github/copilot-instructions.md', '.github/instructions/*', '.cursorrules', '.cursor/rules/*', '.windsurfrules',
+        ],
+      },
+      { id: 'skills', label: 'Project skills', kind: 'files', safety: 'careful', about: 'Skills that only exist in one project.', include: ['.claude/skills/*'] },
+      {
+        id: 'commands', label: 'Project commands & prompts', kind: 'files', safety: 'careful', about: 'Slash commands and saved prompts that only exist in one project.',
+        include: ['.claude/commands/*', '.gemini/commands/*', '.github/prompts/*', '.codex/prompts/*'],
+      },
+      { id: 'agents', label: 'Project agents', kind: 'files', safety: 'careful', about: 'Custom agents that only exist in one project.', include: ['.claude/agents/*', '.github/agents/*'] },
+      { id: 'settings', label: 'Project settings', kind: 'text', safety: 'keep', about: 'Per-project permissions and hooks.', include: ['.claude/settings.json', '.claude/settings.local.json'] },
     ],
   },
 ];

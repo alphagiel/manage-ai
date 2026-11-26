@@ -49,6 +49,51 @@ async function expandAll(root, patterns = [], exclude = []) {
   return [...out];
 }
 
+/** expandAll across several roots (one per project for per-project tools). */
+async function expandRoots(roots, patterns, exclude) {
+  const out = await Promise.all(roots.map((r) => expandAll(r, patterns, exclude)));
+  return [...new Set(out.flat())];
+}
+
+/** The deepest project that contains p, so a worktree isn't filed under its parent folder. */
+const ownerOf = (roots, p) => roots.filter((r) => p.startsWith(r + path.sep)).sort((a, b) => b.length - a.length)[0];
+
+const rootsOf = async (tool) => (tool.perProject ? projectDirs() : [tool.root]);
+
+// ---------- projects ----------
+
+let projectCache = null;
+
+/**
+ * Project folders your AI tools have worked in: Claude Code's project list
+ * (including worktrees) and folders opened in VS Code. Only ones that still exist.
+ */
+export async function projectDirs() {
+  if (projectCache && Date.now() - projectCache.at < 60_000) return projectCache.dirs;
+  const found = new Set();
+  try {
+    const cj = JSON.parse(await fs.readFile(path.join(HOME, '.claude.json'), 'utf8'));
+    for (const p of Object.keys(cj.projects || {})) found.add(p);
+  } catch { /* no Claude */ }
+  for (const p of (await claudeProjectNames()).values()) found.add(p);
+  const vs = TOOL_BY_ID['vscode-copilot'];
+  for (const p of (await vscodeWorkspaces(vs.root)).values()) found.add(p.replace(/ \+ \d+ more$/, ''));
+
+  const toolRoots = TOOLS.filter((t) => t.root).map((t) => t.root);
+  const dirs = [];
+  await Promise.all([...found].map(async (p) => {
+    if (!path.isAbsolute(p) || p === '/' || p === HOME || !p.startsWith(HOME + path.sep)) return;
+    if (p.startsWith(path.join(HOME, 'Library') + path.sep)) return;
+    // Skip hidden folders like repo/.claude — they belong to the repo above them
+    if (path.relative(HOME, p).split(path.sep).some((seg) => seg.startsWith('.'))) return;
+    if (toolRoots.some((r) => p === r || p.startsWith(r + path.sep))) return;
+    try { if ((await fs.stat(p)).isDirectory()) dirs.push(p); } catch { /* gone */ }
+  }));
+  dirs.sort();
+  projectCache = { at: Date.now(), dirs };
+  return dirs;
+}
+
 // ---------- sizes ----------
 
 /** Size in bytes of each path, via `du -sk` (fast, follows macOS conventions). */
@@ -95,13 +140,15 @@ export async function overview({ fresh = false } = {}) {
 
 async function scanTool(tool) {
   let exists = false;
-  try { exists = (await fs.stat(tool.root)).isDirectory(); } catch { /* not installed */ }
+  if (tool.perProject) exists = true;
+  else try { exists = (await fs.stat(tool.root)).isDirectory(); } catch { /* not installed */ }
   if (!exists) {
     return { id: tool.id, name: tool.name, color: tool.color, root: tool.root, exists, size: 0, categories: [] };
   }
 
+  const roots = await rootsOf(tool);
   const matched = await Promise.all(
-    tool.categories.map((c) => expandAll(tool.root, c.include, c.exclude)),
+    tool.categories.map((c) => expandRoots(roots, c.include, c.exclude)),
   );
   const extra = (tool.extraFiles || []).map((f) => f.path);
   const all = [...new Set([...matched.flat(), ...extra])];
@@ -121,7 +168,7 @@ async function scanTool(tool) {
   // Count what the user would see in the list (e.g. chat files, not project folders).
   const itemCounts = await Promise.all(tool.categories.map(async (c, i) => {
     if (c.list === 'claude-plugins') return (await claudePluginPaths()).length;
-    return c.items ? (await expandAll(tool.root, c.items)).length : matched[i].length;
+    return c.items ? (await expandRoots(roots, c.items)).length : matched[i].length;
   }));
 
   const categories = tool.categories.map((c, i) => {
@@ -141,8 +188,10 @@ async function scanTool(tool) {
   }
   categories.sort((a, b) => b.size - a.size);
 
+  if (tool.perProject) exists = categories.some((c) => c.count > 0);
   return {
-    id: tool.id, name: tool.name, color: tool.color, root: tool.root, exists,
+    id: tool.id, name: tool.name, color: tool.color, root: tool.root, exists, perProject: Boolean(tool.perProject),
+    projects: tool.perProject ? new Set(matched.flat().map((p) => ownerOf(roots, p))).size : undefined,
     size: categories.reduce((a, c) => a + c.size, 0),
     categories,
   };
@@ -165,13 +214,14 @@ export async function listCategory(toolId, catId) {
     if (!cat) throw httpError(404, 'Unknown category');
     paths = cat.list === 'claude-plugins'
       ? await claudePluginPaths()
-      : await expandAll(tool.root, cat.items || cat.include, cat.items ? [] : cat.exclude);
+      : await expandRoots(await rootsOf(tool), cat.items || cat.include, cat.items ? [] : cat.exclude);
     for (const f of tool.extraFiles || []) if (f.category === cat.id) paths.push(f.path);
   }
 
   const sizeMap = await sizes(paths);
   const projects = tool.id === 'claude' ? await claudeProjectNames()
-    : tool.id === 'vscode-copilot' ? await vscodeWorkspaces(tool.root) : null;
+    : tool.id === 'vscode-copilot' ? await vscodeWorkspaces(tool.root)
+      : tool.perProject ? await projectDirs() : null;
   const items = await Promise.all(paths.map(async (p) => {
     let st;
     try { st = await fs.stat(p); } catch { return null; }
@@ -196,6 +246,11 @@ export async function listCategory(toolId, catId) {
 
 /** Friendly project name for grouping, e.g. "-Users-me-Work-app" → "Work/app". */
 function groupLabel(tool, p, projects) {
+  if (tool.perProject) {
+    // longest matching project wins, so a worktree isn't filed under its parent repo
+    const root = ownerOf(projects, p);
+    return root ? root.replace(HOME, '~') : '';
+  }
   const rel = path.relative(tool.root, p).split(path.sep);
   if (tool.id === 'claude' && rel[0] === 'projects' && rel[1]) {
     const real = projects?.get(rel[1]);

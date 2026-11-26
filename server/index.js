@@ -15,6 +15,7 @@ import { TOOL_BY_ID } from './tools.js';
 const HOST = '127.0.0.1';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = path.join(ROOT, 'public');
+const VERSION = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8')).version;
 // Resolved through Node so it works when npx hoists htm somewhere else
 // (htm's main entry is dist/htm.js, so its package root is two levels up)
 const VENDOR = path.join(path.dirname(path.dirname(createRequire(import.meta.url).resolve('htm'))), 'preact', 'standalone.module.js');
@@ -113,7 +114,7 @@ app.get('*', async (c) => {
   if (!file.startsWith(PUBLIC + path.sep)) return c.text('Not found', 404);
   try { await fs.access(file); } catch { rel = 'index.html'; file = path.join(PUBLIC, rel); }
   let body = await fs.readFile(file);
-  if (rel === 'index.html') body = body.toString().replace('__TOKEN__', TOKEN);
+  if (rel === 'index.html') body = body.toString().replace('__TOKEN__', TOKEN).replace('__VERSION__', VERSION);
   return c.body(body, 200, {
     'content-type': `${TYPES[path.extname(file)] || 'application/octet-stream'}; charset=utf-8`,
     'cache-control': 'no-store',

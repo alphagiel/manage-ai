@@ -47,6 +47,8 @@ Fills a fake home folder (`/tmp/manage-ai-demo`) with made-up chats, memory and 
 
 Claude Code · Codex · Gemini CLI · Copilot CLI · Copilot in VS Code · Cursor · Windsurf/Codeium
 
+Also looks **inside every project and worktree** your AI tools have opened, for the rules, skills, commands, agents and settings that live there (`CLAUDE.md`, `AGENTS.md`, `.claude/skills`, `.cursor/rules`, `.github/prompts`…). It only touches those AI files, never your code.
+
 Tool definitions live in `server/tools.js` — add a tool by adding an entry.
 
 ## Safety

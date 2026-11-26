@@ -172,12 +172,23 @@ async function claude() {
     '---\nname: write-tests\ndescription: Write tests for a file, matching the repo style\n---\n\n# Write tests\n\n1. Read the file.\n2. Find the existing test style.\n3. Cover the happy path and the edge cases.\n', 10);
 
   await write(H('.claude.json'), json({
-    projects: Object.fromEntries([...new Set(CHATS.map((c) => c.project))].map((p) => [project(p), {}])),
+    projects: Object.fromEntries([...new Set([...CHATS.map((c) => c.project), 'recipe-box-worktree-old-search'])].map((p) => [project(p), {}])),
     mcpServers: {
       github: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], env: { GITHUB_TOKEN: 'demo-not-a-real-token' } },
       playwright: { command: 'npx', args: ['@playwright/mcp'] },
     },
   }), 0);
+
+  // Stuff living inside the projects themselves, including a forgotten worktree
+  const rp = project('recipe-box');
+  await write(path.join(rp, 'CLAUDE.md'), '# recipe-box\n\n- React + SQLite.\n- Run `pnpm test` before committing.\n', 9);
+  await write(path.join(rp, 'AGENTS.md'), '# recipe-box\n\nSame rules as CLAUDE.md, for Codex.\n', 9);
+  await write(path.join(rp, '.claude', 'commands', 'seed-db.md'), '---\ndescription: Fill the database with sample recipes\n---\n\nRun db/seed.sql.\n', 7);
+  await write(path.join(rp, '.claude', 'settings.local.json'), json({ permissions: { allow: ['Bash(pnpm dev)'] } }), 7);
+  const wt = project('recipe-box-worktree-old-search');
+  await write(path.join(wt, 'CLAUDE.md'), '# recipe-box (search branch)\n\n- Use the OLD search API (v1). We dropped this months ago.\n', 60);
+  await write(path.join(wt, '.claude', 'skills', 'search-v1', 'SKILL.md'), '---\nname: search-v1\ndescription: Query the old v1 search API\n---\n\nUse /api/v1/search.\n', 60);
+  await write(path.join(project('pixel-pets'), '.cursor', 'rules', 'game-style.mdc'), '---\ndescription: Keep it colorful and kid friendly\n---\n\nBright colors, big buttons.\n', 15);
 
   // Junk
   await write(H('.claude', 'paste-cache', 'paste-1.txt'), blob(6), 3);

@@ -340,3 +340,28 @@ h3 { font-size: 15px; font-weight: 700; margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- support ---------- */
+.support-tab {
+  position: fixed; right: 20px; bottom: 0; z-index: 14;
+  padding: 9px 16px 10px; border-radius: 14px 14px 0 0; border: 1px solid var(--line); border-bottom: 0;
+  background: var(--card); color: var(--ink); font-weight: 700; font-size: 14px; cursor: pointer;
+  box-shadow: var(--shadow-pop); transition: transform .12s, color .12s;
+}
+.support-tab:hover { color: var(--accent); transform: translateY(-2px); }
+.modal.support { text-align: left; width: min(480px, 100%); }
+.modal.support .byte { display: block; margin: 4px auto 8px; }
+.support-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.support-head h2 { flex: 1; margin: 0; }
+.support-kinds { display: grid; gap: 10px; margin-top: 16px; }
+.support-kind {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-align: left;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); cursor: pointer; transition: all .12s;
+}
+.support-kind:hover { border-color: var(--accent); background: var(--accent-soft); }
+.support-kind .emoji { font-size: 24px; }
+.support-kind b { display: block; }
+.support-kind small { color: var(--ink-3); }
+.support-text { width: 100%; min-height: 140px; margin: 10px 0 6px; resize: vertical; }
+.small { font-size: 13px; }
+@media (max-width: 640px) { .support-tab { right: 12px; } }

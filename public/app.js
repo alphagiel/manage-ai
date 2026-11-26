@@ -59,7 +59,7 @@ const tilde = (p) => p?.replace(/^\/Users\/[^/]+/, '~');
 // ---------- what each tool and kind of stuff looks like ----------
 
 const BADGE = {
-  claude: 'Cl', codex: 'Cx', gemini: 'Ge', 'copilot-cli': 'Co', 'vscode-copilot': 'Vs', cursor: 'Cu', windsurf: 'Ws',
+  claude: 'Cl', codex: 'Cx', gemini: 'Ge', 'copilot-cli': 'Co', 'vscode-copilot': 'Vs', cursor: 'Cu', windsurf: 'Ws', projects: 'Pr',
 };
 
 const KINDS = {
@@ -212,6 +212,7 @@ function App() {
         ${page}
       </div>
       ${drawer && html`<${Drawer} ...${drawer} onClose=${() => setDrawer(null)} />`}
+      <${Support} />
       ${modal && html`<${Modal} ...${modal} onDone=${(v) => { modal.resolve(v); setModal(null); }} />`}
       <div class="toasts" role="status" aria-live="polite">
         ${toasts.map((t) => html`
@@ -221,6 +222,89 @@ function App() {
           </div>`)}
       </div>
     <//>`;
+}
+
+// ---------- support ----------
+
+// Built from parts so the address isn't sitting in the page as one scrapeable string.
+const SUPPORT_EMAIL = ['lfagel84', 'gmail.com'].join('@');
+const VERSION = document.querySelector('meta[name="manage-ai-version"]')?.content || '';
+
+const SUPPORT_KINDS = [
+  { id: 'question', emoji: '🙋', title: 'Ask a question', blurb: 'Anything about manage-ai', hint: 'What do you want to know?' },
+  { id: 'bug', emoji: '🐞', title: 'Report a bug', blurb: 'Something broken or weird', hint: 'What happened, and what did you expect?' },
+  { id: 'feature', emoji: '💡', title: 'Feature request', blurb: 'An idea to make it better', hint: 'What would make this better? A tool we should support?' },
+  { id: 'feedback', emoji: '💬', title: 'General feedback', blurb: 'Love it, hate it, tell me', hint: 'Anything on your mind.' },
+];
+
+/**
+ * Floating "Support" tab. Pick a type, write, then Send opens your mail app with
+ * everything filled in — nothing is sent from here, you hit send yourself.
+ */
+function Support() {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState(null);
+  const [text, setText] = useState('');
+  const [sent, setSent] = useState(false);
+  const K = SUPPORT_KINDS.find((k) => k.id === kind);
+
+  const close = () => { setOpen(false); if (sent) { setKind(null); setText(''); setSent(false); } };
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && close();
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [open, sent]);
+
+  const send = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    const first = text.trim().split('\n')[0].slice(0, 60);
+    const subject = `[manage-ai] ${K.title}: ${first}`;
+    const body = `${text.trim()}\n\n—\nmanage-ai ${VERSION}`;
+    location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSent(true);
+  };
+
+  return html`
+    <button class="support-tab" onClick=${() => setOpen(true)}>💬 Support</button>
+    ${open && html`
+      <div class="modal-wrap" onClick=${(e) => e.target === e.currentTarget && close()}>
+        <div class="card modal support" role="dialog" aria-modal="true" aria-labelledby="support-title">
+          <div class="support-head">
+            ${K && !sent && html`<button class="btn quiet icon" onClick=${() => setKind(null)} aria-label="Back">${G.back}</button>`}
+            <h2 id="support-title">${sent ? 'Thanks!' : K ? K.title : 'Support'}</h2>
+            <button class="btn quiet icon" onClick=${close} aria-label="Close">${G.close}</button>
+          </div>
+
+          ${sent ? html`
+            <${Byte} size=${72} mood="happy" />
+            <p>Your mail app should be open with the message ready. Hit send there and it comes straight to me.</p>
+            <p class="ink-3 small">Mail app didn’t open? Email <b class="mono">${SUPPORT_EMAIL}</b></p>
+            <div class="modal-actions"><button class="btn primary" onClick=${close}>Done</button></div>`
+
+          : !K ? html`
+            <p>Hey 👋 I’m the person who made manage-ai. Tell me anything.</p>
+            <div class="support-kinds">
+              ${SUPPORT_KINDS.map((k) => html`
+                <button class="support-kind" onClick=${() => setKind(k.id)}>
+                  <span class="emoji">${k.emoji}</span>
+                  <span><b>${k.title}</b><small>${k.blurb}</small></span>
+                </button>`)}
+            </div>`
+
+          : html`
+            <form onSubmit=${send}>
+              <textarea class="editor support-text" rows="6" maxlength="2000" autofocus
+                placeholder=${K.hint} value=${text} onInput=${(e) => setText(e.target.value)} />
+              <p class="ink-3 small">Opens your mail app with this filled in. Nothing is sent until you hit send there.</p>
+              <div class="modal-actions">
+                <button type="button" class="btn quiet" onClick=${() => setKind(null)}>Back</button>
+                <button type="submit" class="btn primary" disabled=${!text.trim()}>Write email</button>
+              </div>
+            </form>`}
+        </div>
+      </div>`}`;
 }
 
 // ---------- shared ----------
@@ -265,8 +349,11 @@ function HomePage() {
   const { ov, mcp, details } = useApp();
   if (!ov) return html`<${Hello} mood="think">Let me look around your Mac…<//><${Loading} />`;
 
-  const tools = ov.tools.filter((t) => t.exists && t.size > 0).sort((a, b) => b.size - a.size);
-  const missing = ov.tools.filter((t) => !t.exists || t.size === 0);
+  const found = ov.tools.filter((t) => t.exists && t.size > 0);
+  // The projects card goes last: it's a different kind of place, not an AI tool
+  const tools = [...found.filter((t) => !t.perProject).sort((a, b) => b.size - a.size), ...found.filter((t) => t.perProject)];
+  const missing = ov.tools.filter((t) => !t.perProject && (!t.exists || t.size === 0));
+  const aiCount = found.filter((t) => !t.perProject).length;
   const junk = junkList(ov).filter((j) => j.cat.clean);
   const junkSize = junk.reduce((a, j) => a + j.cat.size, 0);
 
@@ -274,7 +361,7 @@ function HomePage() {
     <${Hello} cta=${junkSize > 0 && html`
       <button class="btn primary big" onClick=${() => go('cleanup')}>🧹 Free up ${bytes(junkSize)}</button>
       <small>Only junk. Nothing you’d miss.</small>`}>
-      Hey! 👋 I looked around your Mac. You’ve used <b>${plural(tools.length, 'AI tool', 'AI tools')}</b>,
+      Hey! 👋 I looked around your Mac. You’ve used <b>${plural(aiCount, 'AI tool', 'AI tools')}</b>,
       and they’re keeping <b>${bytes(ov.total)}</b> of stuff${ov.total >= 8 * 1024 * 1024 ? ` — about as much as ${photos(ov.total)} photos` : ''}.
     <//>
 
@@ -288,7 +375,7 @@ function HomePage() {
               <${Badge} tool=${t} />
               <div style="min-width:0">
                 <div class="tool-name truncate">${t.name}</div>
-                <div class="tool-size">${bytes(t.size)}</div>
+                <div class="tool-size">${t.perProject ? `${plural(t.projects, 'project', 'projects')} · ${bytes(t.size)}` : bytes(t.size)}</div>
               </div>
             </div>
             <div class="pills">
@@ -333,8 +420,10 @@ function ToolPage({ toolId }) {
     </div>
 
     <${Tip}>
-      <b>${tool.name}</b> is keeping ${bytes(tool.size)}.
-      ${biggest && biggest.size > 0 && html` Most of it is <b>${KINDS[biggest.kind].label.toLowerCase()}</b>.`}
+      ${tool.perProject ? html`These live inside <b>${plural(tool.projects, 'project', 'projects')}</b> you’ve opened with AI —
+        including old worktrees. They load every time you work there, so stale ones still steer your AI.` : html`
+      <b>${tool.name}</b> is keeping ${bytes(tool.size)}.`}
+      ${!tool.perProject && biggest && biggest.size > 0 && html` Most of it is <b>${KINDS[biggest.kind].label.toLowerCase()}</b>.`}
       ${' '}Tap a box to look inside.
     <//>
 
@@ -482,7 +571,7 @@ function ItemList({ tool, cats, kind }) {
                   <div class="t truncate">${label(i)}</div>
                   <div class="s truncate">${[
                     i.subtitle,
-                    i.group && !i.subtitle ? `in ${i.group.split('/').pop()}` : null,
+                    i.group && (!i.subtitle || tool.perProject) ? `in ${i.group.split('/').pop()}` : null,
                     app.details ? tilde(i.path) : null,
                   ].filter(Boolean).join(' · ') || ' '}</div>
                 </div>

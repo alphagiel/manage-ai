@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { TOOLS, HOME } from './tools.js';
+import { projectDirs } from './scan.js';
 import { listMcp } from './readers.js';
 import { httpError } from './scan.js';
 
@@ -23,16 +24,40 @@ export async function guard(p, { forWrite = false } = {}) {
   const resolved = path.resolve(p);
 
   // Compare real paths on both sides, so symlinks (e.g. /tmp → /private/tmp) still match
-  const roots = await Promise.all(TOOLS.map((t) => realish(t.root)));
+  const roots = await Promise.all(TOOLS.filter((t) => t.root).map((t) => realish(t.root)));
   const files = new Set(TOOLS.flatMap((t) => (t.extraFiles || []).map((f) => f.path)));
   for (const m of await listMcp()) if (m.source?.startsWith('/')) files.add(m.source);
   const realFiles = new Set(await Promise.all([...files].map(realish)));
 
   const real = await realish(resolved);
   const insideRoot = roots.some((r) => real !== r && real.startsWith(r + path.sep));
-  if (!insideRoot && !files.has(resolved) && !realFiles.has(real)) throw httpError(403, 'Outside AI tool folders');
+  if (!insideRoot && !files.has(resolved) && !realFiles.has(real) && !(await inProjectAiFiles(real))) {
+    throw httpError(403, 'Outside AI tool folders');
+  }
   if (forWrite && roots.includes(real)) throw httpError(403, 'Won’t touch a whole tool folder');
   return resolved;
+}
+
+/**
+ * Inside a project, only the AI files themselves are allowed: exact rule files
+ * (CLAUDE.md…) and things strictly inside AI folders (.claude/skills/…). Never the
+ * project folder or your code.
+ */
+async function inProjectAiFiles(real) {
+  const tool = TOOLS.find((t) => t.perProject);
+  if (!tool) return false;
+  const patterns = tool.categories.flatMap((c) => c.include);
+  for (const dir of await projectDirs()) {
+    const root = await realish(dir);
+    if (!real.startsWith(root + path.sep)) continue;
+    for (const pat of patterns) {
+      if (pat.endsWith('/*')) {
+        const base = path.join(root, pat.slice(0, -2));
+        if (real.startsWith(base + path.sep)) return true;
+      } else if (real === path.join(root, pat)) return true;
+    }
+  }
+  return false;
 }
 
 /** realpath of the path, or of its nearest existing parent (for files about to be created). */
